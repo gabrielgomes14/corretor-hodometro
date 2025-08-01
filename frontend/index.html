@@ -439,8 +439,7 @@
             const formData = new FormData();
             formData.append("file", this.selectedFile);
             try {
-              const backendUrl =
-                "https://corretor-hodometro-7706.onrender.com/";
+              const backendUrl = "https://corretor-hodometro-7706.onrender.com";
               const apiUrl = `${backendUrl}/api/processar`;
 
               const response = await axios.post(apiUrl, formData);
