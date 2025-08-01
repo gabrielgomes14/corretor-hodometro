@@ -17,9 +17,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "https://corretor-frontend.onrender.com"}}, supports_credentials=True)
 
 
-@app.route("/")
-def home():
-    return render_template("index.html")
+
 
 # --- ALTERAÇÃO PRINCIPAL AQUI ---
 # Em ambientes de nuvem como o Render, é mais seguro usar o diretório /tmp para salvar arquivos temporários.
