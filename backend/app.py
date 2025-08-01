@@ -2,7 +2,7 @@ import locale
 import os
 import logging
 from datetime import datetime
-
+from flask import Flask, render_template
 import joblib
 import numpy as np
 import pandas as pd
@@ -17,6 +17,9 @@ app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "https://corretor-frontend.onrender.com"}}, supports_credentials=True)
 
 
+@app.route("/")
+def home():
+    return render_template("index.html")
 
 # --- ALTERAÇÃO PRINCIPAL AQUI ---
 # Em ambientes de nuvem como o Render, é mais seguro usar o diretório /tmp para salvar arquivos temporários.
