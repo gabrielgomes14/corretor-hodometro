@@ -16,10 +16,11 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 CORS(app)
 
-# Configuração de pastas para upload e download
-UPLOAD_FOLDER = 'uploads'
-DOWNLOAD_FOLDER = 'downloads'
-MODEL_DIR = "modelos_hodometro"
+# --- ALTERAÇÃO PRINCIPAL AQUI ---
+# Em ambientes de nuvem como o Render, é mais seguro usar o diretório /tmp para salvar arquivos temporários.
+UPLOAD_FOLDER = '/tmp/uploads'
+DOWNLOAD_FOLDER = '/tmp/downloads'
+MODEL_DIR = "/tmp/modelos_hodometro"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -30,7 +31,7 @@ app.config['DOWNLOAD_FOLDER'] = DOWNLOAD_FOLDER
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
-# --- LÓGICA DE CORREÇÃO ---
+# --- LÓGICA DE CORREÇÃO (O restante do código permanece o mesmo) ---
 
 def calcular_limite_km_por_dia(df: pd.DataFrame, col: str = "Hodômetro") -> float:
     df = df.sort_values("Data").reset_index(drop=True)
@@ -56,22 +57,15 @@ def treinar_modelo(y, dias_frac, modelo_scaler=None):
     X = np.array(dias_frac).reshape(-1, 1)
     y = np.array(y)
     if modelo_scaler is None:
-        scaler = StandardScaler()
-        Xs = scaler.fit_transform(X)
-        mdl = LinearRegression().fit(Xs, y)
+        scaler = StandardScaler(); Xs = scaler.fit_transform(X); mdl = LinearRegression().fit(Xs, y)
     else:
-        mdl, scaler = modelo_scaler
-        Xs = scaler.transform(X)
-        mdl.fit(Xs, y)
+        mdl, scaler = modelo_scaler; Xs = scaler.transform(X); mdl.fit(Xs, y)
     return mdl, scaler
 
 def corrigir_grupo(df_grp: pd.DataFrame, col="Hodômetro"):
     df_grp = df_grp.sort_values("Data").reset_index(drop=True)
-    hod = df_grp[col].tolist()
-    datas = df_grp["Data"].tolist()
-    placa = df_grp.iloc[0]["Placa"]
-    y_corr = [hod[0]]
-    t0 = datas[0]
+    hod = df_grp[col].tolist(); datas = df_grp["Data"].tolist(); placa = df_grp.iloc[0]["Placa"]
+    y_corr = [hod[0]]; t0 = datas[0]
     dias_frac = [(d - t0).total_seconds() / 86400 for d in datas]
     max_km_dia = calcular_limite_km_por_dia(df_grp, col)
     mdl, scl = treinar_modelo(y_corr, dias_frac[:1], carregar_modelo_existente(placa))
@@ -87,8 +81,7 @@ def corrigir_grupo(df_grp: pd.DataFrame, col="Hodômetro"):
         else:
             y_corr.append(hod[i])
     mdl, scl = treinar_modelo(y_corr, dias_frac, (mdl, scl))
-    salvar_modelo(placa, (mdl, scl))
-    df_grp[col] = y_corr
+    salvar_modelo(placa, (mdl, scl)); df_grp[col] = y_corr
     return df_grp
 
 def corrigir_hodometros_repetidos_por_segundo(df: pd.DataFrame, taxa_km_por_segundo: float = 0.01333) -> pd.DataFrame:
@@ -101,14 +94,11 @@ def corrigir_hodometros_repetidos_por_segundo(df: pd.DataFrame, taxa_km_por_segu
                 df.loc[i, "Hodômetro"] = df.loc[i - 1, "Hodômetro"] + incremento
     return df
 
-# ALTERAÇÃO: Função principal agora retorna apenas um DataFrame "cru", sem formatação final
 def corrigir_planilha_com_ia(path: str, col: str = "Hodômetro") -> pd.DataFrame | None:
     try:
         df = pd.read_excel(path)
     except Exception as e:
-        logging.error(f"Erro ao ler planilha: {e}")
-        return None
-        
+        logging.error(f"Erro ao ler planilha: {e}"); return None
     df.columns = df.columns.str.strip()
     colunas_aceitas = { "Data": ["Data", "Data/Hora Transação", "Data Transação"], "Placa": ["Placa"], "Hodômetro": ["Hodômetro", "Hodômetro - Dig. Motorista", "HODOMETRO OU HORIMETRO"],}
     def encontrar_coluna(df_cols, possiveis):
@@ -117,9 +107,7 @@ def corrigir_planilha_com_ia(path: str, col: str = "Hodômetro") -> pd.DataFrame
         return None
     col_data, col_placa, col_hod = encontrar_coluna(df.columns, colunas_aceitas["Data"]), encontrar_coluna(df.columns, colunas_aceitas["Placa"]), encontrar_coluna(df.columns, colunas_aceitas["Hodômetro"])
     if not all([col_data, col_placa, col_hod]):
-        logging.error("Colunas obrigatórias não encontradas.")
-        return None
-        
+        logging.error("Colunas obrigatórias não encontradas."); return None
     df = df.rename(columns={col_data: "Data", col_placa: "Placa", col_hod: "Hodômetro"})
     df["Data"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
     df = df.dropna(subset=["Data"])
@@ -128,74 +116,48 @@ def corrigir_planilha_com_ia(path: str, col: str = "Hodômetro") -> pd.DataFrame
     df["Hodômetro"] = df["Hodômetro"].astype(float)
     corrigidos = [corrigir_grupo(corrigir_hodometros_repetidos_por_segundo(grp.copy())) for _, grp in df.groupby("Placa")]
     df_final = pd.concat(corrigidos).sort_values(["Placa", "Data"]).reset_index(drop=True)
-    
     return df_final
 
 
 # --- ENDPOINTS DA API FLASK ---
-
 @app.route('/')
 def index():
-    return jsonify({
-        "status": "online",
-        "message": "Backend do Corretor de Hodômetro está no ar. Acesse o frontend para usar a aplicação."
-    })
+    return jsonify({ "status": "online", "message": "Backend do Corretor de Hodômetro está no ar." })
 
-# ALTERAÇÃO: A lógica de formatação e envio de dados para a tabela foi movida para cá
 @app.route('/api/processar', methods=['POST'])
 def processar_arquivo():
-    if 'file' not in request.files:
-        return jsonify({"error": "Nenhum arquivo enviado"}), 400
-    
+    if 'file' not in request.files: return jsonify({"error": "Nenhum arquivo enviado"}), 400
     file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "Nenhum arquivo selecionado"}), 400
-
+    if file.filename == '': return jsonify({"error": "Nenhum arquivo selecionado"}), 400
     if file:
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
-        logging.info(f"Arquivo salvo em {filepath}")
-
-        # Roda a função de processamento, que retorna um DataFrame limpo
         df_corrigido = corrigir_planilha_com_ia(filepath)
-
         if df_corrigido is None:
-            return jsonify({"error": "Falha ao processar o arquivo. Verifique o console do backend."}), 500
+            return jsonify({"error": "Falha ao processar o arquivo."}), 500
 
-        # 1. Prepara os dados para o PREVIEW (JSON)
-        # Cria uma cópia, formata a data para texto e arredonda o hodômetro
         df_preview = df_corrigido.head(100).copy()
         df_preview['Data'] = df_preview['Data'].dt.strftime('%Y-%m-%d %H:%M:%S')
         df_preview['Hodômetro'] = df_preview['Hodômetro'].round(1)
         preview_data = df_preview.to_dict(orient='records')
         
-        # 2. Prepara os dados para o EXCEL (com formatação de locale)
-        # Cria outra cópia e aplica a formatação brasileira de forma segura
         df_excel = df_corrigido.copy()
         try:
             locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
             df_excel['Hodômetro'] = df_excel['Hodômetro'].apply(lambda x: locale.format_string('%.1f', x, grouping=True) if pd.notnull(x) else '')
         except locale.Error:
-            logging.warning("Locale 'pt_BR.UTF-8' não disponível. Hodômetro no Excel não será formatado no padrão BR.")
+            logging.warning("Locale 'pt_BR.UTF-8' não disponível. Formatando hodômetro com ponto decimal.")
             df_excel['Hodômetro'] = df_excel['Hodômetro'].apply(lambda x: f'{x:.1f}' if pd.notnull(x) else '')
-        
         df_excel['Data'] = df_excel['Data'].dt.strftime('%Y-%m-%d %H:%M:%S')
         df_excel = df_excel.replace({np.nan: None})
 
-        # Salva o arquivo Excel formatado
         download_filename = f"corrigido_{filename}"
         download_path = os.path.join(app.config['DOWNLOAD_FOLDER'], download_filename)
         df_excel.to_excel(download_path, index=False)
-        logging.info(f"Arquivo corrigido salvo em {download_path}")
-
         download_url = f"/api/download/{download_filename}"
-
-        # 3. Retorna a URL de download E os dados da pré-visualização para o frontend
-        return jsonify({
-            "downloadUrl": download_url,
-            "previewData": preview_data 
-        })
+        
+        return jsonify({ "downloadUrl": download_url, "previewData": preview_data })
 
 @app.route('/api/download/<filename>', methods=['GET'])
 def download_arquivo(filename):
