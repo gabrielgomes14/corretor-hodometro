@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+.venv
+venv/
+
+# Pastas de dados do Render
+/backend/uploads/
+/backend/downloads/
+/backend/modelos_hodometro/
+
+# Arquivos de IDE
+.vscode/
+.idea/

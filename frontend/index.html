@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corretor de Hodômetro</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            /* Variáveis de Cores - Tema Claro (Padrão) */
+            --bg-color: #f4f7f6;
+            --main-content-bg: white;
+            --card-shadow: rgba(0,0,0,0.1);
+            --text-primary: #333;
+            --text-secondary: #666;
+            --border-color: #ddd;
+            --table-header-bg: #f4f7f6;
+            --table-row-even-bg: #f9f9f9;
+        }
+
+        /* --- NOVAS VARIÁVEIS PARA O DARK MODE --- */
+        .dark-mode {
+            --bg-color: #1a1a1a;
+            --main-content-bg: #2d2d2d;
+            --card-shadow: rgba(0,0,0,0.4);
+            --text-primary: #e0e0e0;
+            --text-secondary: #aaa;
+            --border-color: #444;
+            --table-header-bg: #3a3a3a;
+            --table-row-even-bg: #333;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .app-container { display: flex; height: 100vh; }
+        .sidebar { width: 260px; background-color: #2c3e50; color: white; display: flex; flex-direction: column; padding-top: 1.5rem; }
+        .sidebar-header { padding: 0 1.5rem 1.5rem 1.5rem; text-align: center; border-bottom: 1px solid #34495e; }
+        .sidebar-logo { max-width: 80%; height: auto; }
+        .menu-items { list-style: none; flex-grow: 1; margin-top: 1rem; }
+        .menu-items li a { display: flex; align-items: center; padding: 1rem 1.5rem; color: #bdc3c7; text-decoration: none; transition: background-color 0.3s, color 0.3s; border-left: 4px solid transparent; }
+        .menu-items li a i { width: 30px; font-size: 1.1rem; margin-right: 1rem; }
+        .menu-items li a:hover { background-color: #34495e; color: white; }
+        .menu-items li.active a { background-color: #34495e; color: white; border-left-color: #3498db; }
+        
+        /* NOVO: Rodapé do Menu Lateral para o Toggle */
+        .sidebar-footer { padding: 1.5rem; margin-top: auto; border-top: 1px solid #34495e; }
+        .dark-mode-toggle { display: flex; align-items: center; justify-content: space-between; color: #bdc3c7; font-size: 0.9rem; }
+        .dark-mode-toggle span { margin-left: -20px;}
+        .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4c5d6e; transition: .4s; border-radius: 26px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #3498db; }
+        input:checked + .slider:before { transform: translateX(24px); }
+
+        .main-content { flex-grow: 1; padding: 2rem; overflow-y: auto; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .app-card { background: var(--main-content-bg); padding: 2rem 3rem; border-radius: 12px; box-shadow: 0 10px 25px var(--card-shadow); text-align: center; width: 100%; max-width: 700px; margin-top: auto; transition: background-color 0.3s, box-shadow 0.3s; }
+        h1 { color: var(--text-primary); }
+        p { color: var(--text-secondary); margin-bottom: 2rem; }
+        .upload-area { border: 2px dashed var(--border-color); color: var(--text-secondary); border-radius: 8px; padding: 2rem; margin-bottom: 1rem; cursor: pointer; transition: border-color 0.3s, background-color 0.3s; }
+        .upload-area:hover, .upload-area.dragover { border-color: #007bff; background-color: rgba(0, 123, 255, 0.05); }
+        
+        .button { display: inline-block; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 1rem; cursor: pointer; transition: background-color 0.3s; width: 100%; box-sizing: border-box; text-decoration: none; }
+        .button-process { background-color: #007bff; }
+        .button-process:disabled { background-color: #555; cursor: not-allowed; }
+        .button-process:hover:not(:disabled) { background-color: #0056b3; }
+        .button-download { background-color: #28a745; }
+        .button-download:hover { background-color: #218838; }
+        .message.error { margin-top: 1.5rem; font-weight: 500; color: #dc3545; }
+        .footer { width: 100%; text-align: center; padding: 1rem 0; color: var(--text-secondary); font-size: 0.9rem; margin-top: auto; }
+
+        .results-container { margin-top: 2rem; width: 100%; text-align: left; }
+        .success-banner { background-color: #28a745; color: white; padding: 1rem; border-radius: 8px 8px 0 0; font-weight: 500; }
+        .table-wrapper { max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-top: none; border-radius: 0 0 8px 8px; }
+        .results-table { width: 100%; border-collapse: collapse; }
+        .results-table th, .results-table td { padding: 12px 15px; border-bottom: 1px solid var(--border-color); }
+        .results-table thead th { background-color: var(--table-header-bg); position: sticky; top: 0; font-weight: 600; }
+        .results-table tbody tr:nth-child(even) { background-color: var(--table-row-even-bg); }
+    </style>
+</head>
+<body>
+
+<div class="app-container" id="app">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <img src="assets/fleet (2).png" alt="Logo da Empresa" class="sidebar-logo">
+        </div>
+        <ul class="menu-items">
+            <li :class="{ active: activeMenu === 'corretor' }" @click.prevent="activeMenu = 'corretor'"><a href="#"><i class="fas fa-tachometer-alt"></i><span>Corretor de Hodômetro</span></a></li>
+            <li :class="{ active: activeMenu === 'dashboard' }" @click.prevent="activeMenu = 'dashboard'"><a href="#"><i class="fas fa-chart-line"></i><span>Dashboard (futuro)</span></a></li>
+            <li :class="{ active: activeMenu === 'config' }" @click.prevent="activeMenu = 'config'"><a href="#"><i class="fas fa-cog"></i><span>Configurações (futuro)</span></a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="dark-mode-toggle">
+                <i class="fas fa-moon"></i>
+                <span>Modo Escuro</span>
+                <label class="switch">
+                    <input type="checkbox" v-model="isDarkMode" @change="toggleDarkMode">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="app-card">
+            <h1>🤖 Corretor de Hodômetro</h1>
+            <p>Faça o upload da sua planilha Excel. A aplicação irá corrigir os dados e fornecer um link para download.</p>
+            <div class="upload-area" @click="triggerFileUpload" @dragover.prevent="isDragging=true" @dragleave.prevent="isDragging=false" @drop.prevent="handleFileDrop" :class="{ dragover: isDragging }">
+                <input type="file" ref="fileInput" @change="handleFileUpload" accept=".xlsx, .xls">
+                <span v-if="!selectedFile">Clique ou arraste a planilha para cá</span>
+                <span v-else>Arquivo selecionado: <strong>{{ selectedFile.name }}</strong></span>
+            </div>
+            <button v-if="!downloadUrl" @click="submitFile" :disabled="!selectedFile || isLoading" class="button button-process">
+                <span v-if="isLoading">Processando...</span>
+                <span v-else>Processar Planilha</span>
+            </button>
+            <a v-else :href="downloadUrl" download class="button button-download">Baixar Arquivo Corrigido</a>
+            <div v-if="message && messageType === 'error'" class="message error"><p>{{ message }}</p></div>
+            <div v-if="correctedData.length > 0" class="results-container">
+                <div class="success-banner"><i class="fas fa-check-circle"></i> Arquivo corrigido e carregado!</div>
+                <div class="table-wrapper">
+                    <table class="results-table">
+                        <thead><tr><th v-for="header in tableHeaders" :key="header">{{ header }}</th></tr></thead>
+                        <tbody><tr v-for="(row, index) in correctedData" :key="index"><td v-for="header in tableHeaders" :key="header">{{ row[header] }}</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <footer class="footer">&copy; 2025 ECAR - Inteligência Artificial aplicada à mobilidade</footer>
+    </main>
+</div>
+
+<script>
+    new Vue({
+        el: '#app',
+        data: {
+            activeMenu: 'corretor',
+            selectedFile: null,
+            isLoading: false,
+            isDragging: false,
+            message: '',
+            messageType: '',
+            downloadUrl: '',
+            correctedData: [],
+            tableHeaders: [],
+            // NOVO: estado para controlar o dark mode
+            isDarkMode: false
+        },
+        methods: {
+            // ... (métodos antigos permanecem aqui) ...
+            triggerFileUpload() { this.$refs.fileInput.click(); },
+            handleFileUpload(event) { this.selectedFile = event.target.files[0]; this.resetStatus(); },
+            handleFileDrop(event) { this.isDragging = false; this.selectedFile = event.dataTransfer.files[0]; this.resetStatus(); },
+            resetStatus() { this.downloadUrl = ''; this.message = ''; this.messageType = ''; this.correctedData = []; this.tableHeaders = []; },
+            async submitFile() {
+                if (!this.selectedFile) return;
+                this.isLoading = true; this.resetStatus();
+                const formData = new FormData();
+                formData.append('file', this.selectedFile);
+                try {
+                    const apiUrl = 'http://127.0.0.1:5000/api/processar';
+                    const response = await axios.post(apiUrl, formData);
+                    const backendUrl = 'http://127.0.0.1:5000';
+                    this.downloadUrl = backendUrl + response.data.downloadUrl;
+                    if (response.data.previewData && response.data.previewData.length > 0) {
+                        this.correctedData = response.data.previewData;
+                        this.tableHeaders = Object.keys(response.data.previewData[0]);
+                    }
+                } catch (error) {
+                    this.messageType = 'error';
+                    if (error.response) { this.message = `Erro: ${error.response.data.error || 'Não foi possível processar o arquivo.'}`; }
+                    else { this.message = 'Erro de conexão. O servidor backend está no ar?'; }
+                    console.error('Erro detalhado:', error);
+                } finally { this.isLoading = false; }
+            },
+            
+            // NOVO: método para alternar o dark mode
+            toggleDarkMode() {
+                // A `v-model` já atualiza `isDarkMode`, aqui apenas salvamos e aplicamos
+                localStorage.setItem('darkMode', this.isDarkMode);
+                this.applyTheme();
+            },
+            // NOVO: método para aplicar o tema (claro ou escuro)
+            applyTheme() {
+                if (this.isDarkMode) {
+                    document.body.classList.add('dark-mode');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                }
+            }
+        },
+        // NOVO: hook que roda quando o app é criado
+        created() {
+            // Verifica se há uma preferência salva no localStorage
+            const savedMode = localStorage.getItem('darkMode');
+            if (savedMode) {
+                this.isDarkMode = savedMode === 'true';
+            }
+            // Aplica o tema (salvo ou o padrão) ao carregar a página
+            this.applyTheme();
+        }
+    });
+</script>
+
+</body>
+</html>
