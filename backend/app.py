@@ -168,7 +168,3 @@ def processar_arquivo():
 @app.route('/api/download/<filename>', methods=['GET'])
 def download_arquivo(filename):
     return send_from_directory(app.config['DOWNLOAD_FOLDER'], filename, as_attachment=True)
-
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
