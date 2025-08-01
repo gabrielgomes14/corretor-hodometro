@@ -14,7 +14,7 @@ from werkzeug.utils import secure_filename
 
 # --- CONFIGURAÇÃO INICIAL DO FLASK ---
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "https://corretor-hodometro-1.onrender.com"}}, supports_credentials=True)
+CORS(app, resources={r"/api/*": {"origins": "https://corretor-frontend.onrender.com"}}, supports_credentials=True)
 
 
 
