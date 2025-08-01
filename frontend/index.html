@@ -49,7 +49,6 @@
         .menu-items li a:hover { background-color: #34495e; color: white; }
         .menu-items li.active a { background-color: #34495e; color: white; border-left-color: #3498db; }
         
-        /* NOVO: Rodapé do Menu Lateral para o Toggle */
         .sidebar-footer { padding: 1.5rem; margin-top: auto; border-top: 1px solid #34495e; }
         .dark-mode-toggle { display: flex; align-items: center; justify-content: space-between; color: #bdc3c7; font-size: 0.9rem; }
         .dark-mode-toggle span { margin-left: -20px;}
@@ -151,11 +150,9 @@
             downloadUrl: '',
             correctedData: [],
             tableHeaders: [],
-            // NOVO: estado para controlar o dark mode
             isDarkMode: false
         },
         methods: {
-            // ... (métodos antigos permanecem aqui) ...
             triggerFileUpload() { this.$refs.fileInput.click(); },
             handleFileUpload(event) { this.selectedFile = event.target.files[0]; this.resetStatus(); },
             handleFileDrop(event) { this.isDragging = false; this.selectedFile = event.dataTransfer.files[0]; this.resetStatus(); },
@@ -166,9 +163,12 @@
                 const formData = new FormData();
                 formData.append('file', this.selectedFile);
                 try {
-                    const apiUrl = 'http://127.0.0.1:5000/api/processar';
+                    // --- ALTERAÇÃO PRINCIPAL AQUI ---
+                    const backendUrl = 'https://corretor-hodometro.onrender.com';
+                    const apiUrl = `${backendUrl}/api/processar`;
+
                     const response = await axios.post(apiUrl, formData);
-                    const backendUrl = 'http://127.0.0.1:5000';
+
                     this.downloadUrl = backendUrl + response.data.downloadUrl;
                     if (response.data.previewData && response.data.previewData.length > 0) {
                         this.correctedData = response.data.previewData;
@@ -181,14 +181,10 @@
                     console.error('Erro detalhado:', error);
                 } finally { this.isLoading = false; }
             },
-            
-            // NOVO: método para alternar o dark mode
             toggleDarkMode() {
-                // A `v-model` já atualiza `isDarkMode`, aqui apenas salvamos e aplicamos
                 localStorage.setItem('darkMode', this.isDarkMode);
                 this.applyTheme();
             },
-            // NOVO: método para aplicar o tema (claro ou escuro)
             applyTheme() {
                 if (this.isDarkMode) {
                     document.body.classList.add('dark-mode');
@@ -197,14 +193,11 @@
                 }
             }
         },
-        // NOVO: hook que roda quando o app é criado
         created() {
-            // Verifica se há uma preferência salva no localStorage
             const savedMode = localStorage.getItem('darkMode');
             if (savedMode) {
                 this.isDarkMode = savedMode === 'true';
             }
-            // Aplica o tema (salvo ou o padrão) ao carregar a página
             this.applyTheme();
         }
     });
