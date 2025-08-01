@@ -14,7 +14,8 @@ from werkzeug.utils import secure_filename
 
 # --- CONFIGURAÇÃO INICIAL DO FLASK ---
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "https://corretor-frontend.onrender.com"}})
+CORS(app, resources={r"/api/*": {"origins": "https://corretor-frontend.onrender.com"}}, supports_credentials=True)
+
 
 
 # --- ALTERAÇÃO PRINCIPAL AQUI ---
@@ -158,7 +159,11 @@ def processar_arquivo():
         df_excel.to_excel(download_path, index=False)
         download_url = f"/api/download/{download_filename}"
         
-        return jsonify({ "downloadUrl": download_url, "previewData": preview_data })
+        response = jsonify({ "downloadUrl": download_url, "previewData": preview_data })
+        response.headers.add("Access-Control-Allow-Origin", "https://corretor-frontend.onrender.com")
+        response.headers.add("Access-Control-Allow-Credentials", "true")
+        return response
+
 
 @app.route('/api/download/<filename>', methods=['GET'])
 def download_arquivo(filename):
