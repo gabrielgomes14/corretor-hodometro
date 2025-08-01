@@ -14,7 +14,8 @@ from werkzeug.utils import secure_filename
 
 # --- CONFIGURAÇÃO INICIAL DO FLASK ---
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "https://corretor-frontend.onrender.com"}})
+
 
 # --- ALTERAÇÃO PRINCIPAL AQUI ---
 # Em ambientes de nuvem como o Render, é mais seguro usar o diretório /tmp para salvar arquivos temporários.
