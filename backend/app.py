@@ -16,25 +16,20 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "https://corretor-frontend.onrender.com"}}, supports_credentials=True)
 
-
-
-
-# --- ALTERAÇÃO PRINCIPAL AQUI ---
-# Em ambientes de nuvem como o Render, é mais seguro usar o diretório /tmp para salvar arquivos temporários.
+# --- CONFIGURAÇÃO DE DIRETÓRIOS ---
+# Usamos diretórios temporários para uploads e downloads. O diretório de modelos foi removido.
 UPLOAD_FOLDER = '/tmp/uploads'
 DOWNLOAD_FOLDER = '/tmp/downloads'
-MODEL_DIR = "/tmp/modelos_hodometro"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
-os.makedirs(MODEL_DIR, exist_ok=True)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['DOWNLOAD_FOLDER'] = DOWNLOAD_FOLDER
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
-# --- LÓGICA DE CORREÇÃO (O restante do código permanece o mesmo) ---
+# --- LÓGICA DE CORREÇÃO ---
 
 def calcular_limite_km_por_dia(df: pd.DataFrame, col: str = "Hodômetro") -> float:
     df = df.sort_values("Data").reset_index(drop=True)
@@ -45,16 +40,6 @@ def calcular_limite_km_por_dia(df: pd.DataFrame, col: str = "Hodômetro") -> flo
     ]
     if vel.empty: return 200.0
     return float(max(np.percentile(vel, 95), 50.0))
-
-def caminho_modelo_placa(placa: str) -> str:
-    return os.path.join(MODEL_DIR, f"modelo_{placa}.pkl")
-
-def carregar_modelo_existente(placa: str):
-    caminho = caminho_modelo_placa(placa)
-    return joblib.load(caminho) if os.path.exists(caminho) else None
-
-def salvar_modelo(placa: str, modelo_scaler):
-    joblib.dump(modelo_scaler, caminho_modelo_placa(placa))
 
 def treinar_modelo(y, dias_frac, modelo_scaler=None):
     X = np.array(dias_frac).reshape(-1, 1)
@@ -71,7 +56,10 @@ def corrigir_grupo(df_grp: pd.DataFrame, col="Hodômetro"):
     y_corr = [hod[0]]; t0 = datas[0]
     dias_frac = [(d - t0).total_seconds() / 86400 for d in datas]
     max_km_dia = calcular_limite_km_por_dia(df_grp, col)
-    mdl, scl = treinar_modelo(y_corr, dias_frac[:1], carregar_modelo_existente(placa))
+    
+    # MODIFICAÇÃO: O modelo agora sempre é iniciado do zero, sem tentar carregar um existente.
+    mdl, scl = treinar_modelo(y_corr, dias_frac[:1], None)
+    
     for i in range(1, len(hod)):
         dias_int = dias_frac[i] - dias_frac[i - 1]
         aumento_max = max_km_dia * dias_int
@@ -83,8 +71,10 @@ def corrigir_grupo(df_grp: pd.DataFrame, col="Hodômetro"):
             y_corr.append(novo)
         else:
             y_corr.append(hod[i])
+            
+    # O modelo é retreinado com os dados da sessão atual, mas não é salvo para uso futuro.
     mdl, scl = treinar_modelo(y_corr, dias_frac, (mdl, scl))
-    salvar_modelo(placa, (mdl, scl)); df_grp[col] = y_corr
+    df_grp[col] = y_corr
     return df_grp
 
 def corrigir_hodometros_repetidos_por_segundo(df: pd.DataFrame, taxa_km_por_segundo: float = 0.01333) -> pd.DataFrame:
